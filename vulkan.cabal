@@ -20,8 +20,8 @@ library
     build-depends:        base >= 4.7 && < 5
     default-language:     Haskell2010
 
-executable mkVulkanBindings
-    main-is:              mkVulkanBindings.hs
+executable generator
+    main-is:              generator.hs
     ghc-options:          -Wall
     build-depends:        base,
                           split
