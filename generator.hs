@@ -1,15 +1,34 @@
-import Data.List
-import Data.List.Split
+{-# LANGUAGE Arrows #-}
+import Text.XML.HXT.Core
 
-type Signature = String
-type Name = String
-type ModuleName = String
-type SectionName = String
-type ExtensionName = String
-type ExportItem = String
+data ExtractedRegistry = ExtractedRegistry
+  { _registryEnums :: [ExtractedEnum]
+  } deriving (Show,Eq)
 
-vulkanEnum :: Name -> Name
-vulkanEnum = ("VK_"++) . intercalate "_" . tail . splitOn "_"
+data ExtractedEnum = ExtractedEnum
+  { _enumName :: String
+  , _enumValue :: String
+  , _enumComment :: String
+  } deriving (Show,Eq)
+
+extract :: ArrowXml a => String -> a XmlTree XmlTree
+extract name = hasName name <<< isElem <<< getChildren
+
+parseEnum :: ArrowXml a => a XmlTree ExtractedEnum
+parseEnum = proc x -> do
+  enum <- extract "enum" -< x
+  name <- getAttrValue0 "name" -< enum
+  value <- getAttrValue0 "value" -< enum
+  comment <- getAttrValue0 "comment" -< enum
+  returnA -< ExtractedEnum name value comment
+
+parseVkXml :: IOSLA (XIOState ()) XmlTree ExtractedRegistry
+parseVkXml = proc x -> do
+  registry <- extract "registry" -< x
+  enums <- listA $ parseEnum <<< extract "enums" -< registry
+  returnA -< ExtractedRegistry enums
 
 main :: IO ()
-main = print "Will generate vulkan bindings based on API"
+main = do
+  result <- runX (readDocument [withRemoveWS yes] "vk.xml" >>> parseVkXml)
+  print result
