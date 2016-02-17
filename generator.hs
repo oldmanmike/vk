@@ -6,7 +6,9 @@ data ExtractedRegistry = ExtractedRegistry
   , _registryTags       :: [ExtractedTag]
   , _registryEnums      :: [ExtractedEnums]
   , _registryCommands   :: [ExtractedCommands]
+  , _registryFeature    :: ExtractedFeature
   } deriving (Show,Eq)
+
 
 data ExtractedVendorId = ExtractedVendorId
   { _vName      :: String
@@ -14,11 +16,13 @@ data ExtractedVendorId = ExtractedVendorId
   , _vComment   :: Maybe String
   } deriving (Show,Eq)
 
+
 data ExtractedTag = ExtractedTag
   { _tName      :: String
   , _tAuthor    :: String
   , _tContact   :: String
   } deriving (Show,Eq)
+
 
 data ExtractedEnums = ExtractedEnums
   { _enumsName        :: String
@@ -29,6 +33,7 @@ data ExtractedEnums = ExtractedEnums
   , _enumsEnumFields  :: [ExtractedEnum]
   } deriving (Show,Eq)
 
+
 data ExtractedEnum = ExtractedEnum
   { _enumName     :: String
   , _enumValue    :: Maybe String
@@ -36,9 +41,11 @@ data ExtractedEnum = ExtractedEnum
   , _enumComment  :: Maybe String
   } deriving (Show,Eq)
 
+
 data ExtractedCommands = ExtractedCommands
   { _commands     :: [ExtractedCommand]
   } deriving (Show,Eq)
+
 
 data ExtractedCommand = ExtractedCommand
   { _cSuccessCodes    :: Maybe String
@@ -52,9 +59,11 @@ data ExtractedCommand = ExtractedCommand
   , _cValidity        :: ExtractedValidity
   } deriving (Show,Eq)
 
+
 data ExtractedValidity = ExtractedValidity
   { _vUses    :: Maybe [String]
   } deriving (Show,Eq)
+
 
 data ExtractedParam = ExtractedParam
   { _parName            :: String
@@ -65,22 +74,73 @@ data ExtractedParam = ExtractedParam
   , _parNoAutoValidity  :: Maybe String
   } deriving (Show,Eq)
 
+
 data ExtractedType = ExtractedType
   { _ptypeName :: String
   , _pPointer  :: Int
   } deriving (Show,Eq)
 
+
+data ExtractedFeature = ExtractedFeature
+  { _fApi       :: String
+  , _fName      :: String
+  , _fNumber    :: String
+  , _fRequires  :: [ExtractedRequire]
+  } deriving (Show,Eq)
+
+
+data ExtractedRequire = ExtractedRequire
+  { _rComment   :: Maybe String
+  , _rTypes     :: Maybe [ExtractedRequiredType]
+  , _rEnums     :: Maybe [ExtractedRequiredEnum]
+  , _rCommands  :: Maybe [ExtractedRequiredCommand]
+  } deriving (Show,Eq)
+
+
+data ExtractedRequiredType = ExtractedRequiredType
+  { _rtName :: String
+  } deriving (Show,Eq)
+
+
+data ExtractedRequiredEnum = ExtractedRequiredEnum
+  { _reName     :: String
+  , _reValue    :: Maybe String
+  , _reOffset   :: Maybe String
+  , _reExtends  :: Maybe String
+  , _reDir      :: Maybe String
+  } deriving (Show,Eq)
+
+
+data ExtractedRequiredCommand = ExtractedRequiredCommand
+  { _rcName :: String
+  } deriving (Show,Eq)
+
+
+data ExtractedExtension = ExtractedExtension
+  { _eName      :: String
+  , _eNumber    :: String
+  , _eProtect   :: Maybe String
+  , _eSupported :: String
+  , _eRequire   :: ExtractedRequire
+  , _eAuthor    :: Maybe String
+  , _eContact   :: Maybe String
+  } deriving (Show,Eq)
+
+
 extract :: ArrowXml a => String -> a XmlTree XmlTree
 extract name = hasName name <<< isElem <<< getChildren
 
+
 perhaps :: ArrowIf a => a b c -> a b (Maybe c)
 perhaps x = (arr Just <<< x) `orElse` constA Nothing
+
 
 parseCommands :: ArrowXml a => a XmlTree ExtractedCommands
 parseCommands = proc x -> do
   commandsblock <- extract "commands" -< x
   commands <- listA $ parseCommand -< commandsblock
   returnA -< ExtractedCommands commands
+
 
 parseCommand :: ArrowXml a => a XmlTree ExtractedCommand
 parseCommand = proc x -> do
@@ -96,17 +156,20 @@ parseCommand = proc x -> do
   maybeValidity <- parseValidity -< command
   returnA -< ExtractedCommand maybeSuccessCode maybeErrorCode maybeQueues maybeRenderpass maybeCmdbufferlevel name cType params maybeValidity
 
+
 parseValidity :: ArrowXml a => a XmlTree ExtractedValidity
 parseValidity = proc x -> do
   validity <- extract "validity" -< x
   uses <- perhaps (listA $ getText <<< getChildren <<< extract "usage") -< validity
   returnA -< ExtractedValidity uses
 
+
 parseType :: ArrowXml a => a XmlTree ExtractedType
 parseType = proc x -> do
   pType <- getText <<< getChildren <<< extract "type" -< x
   pointer <- (getText <<< getChildren) >. length . filter (== '*') . concat -< x
   returnA -< ExtractedType pType pointer
+
 
 parseParam :: ArrowXml a => a XmlTree ExtractedParam
 parseParam = proc x -> do
@@ -119,6 +182,7 @@ parseParam = proc x -> do
   pNoAutoValidity <- perhaps (getAttrValue0 "noautovalidity") -< param
   returnA -< ExtractedParam pName pType pOptional pLen pExternSync pNoAutoValidity
 
+
 parseEnums :: ArrowXml a => a XmlTree ExtractedEnums
 parseEnums = proc x -> do
   enums <- extract "enums" -< x
@@ -130,6 +194,7 @@ parseEnums = proc x -> do
   enumFields <- listA $ parseEnum -< enums
   returnA -< ExtractedEnums eName maybeESType maybeESNamespace maybeESExpand maybeESComment enumFields
 
+
 parseEnum :: ArrowXml a => a XmlTree ExtractedEnum
 parseEnum = proc x -> do
   enum <- extract "enum" -< x
@@ -139,6 +204,7 @@ parseEnum = proc x -> do
   maybeEComment <- perhaps (getAttrValue0 "comment") -< enum
   returnA -< ExtractedEnum name maybeEValue maybeEBitpos maybeEComment
 
+
 parseVendorId :: ArrowXml a => a XmlTree ExtractedVendorId
 parseVendorId = proc x -> do
   vendorID <- extract "vendorid" -< x
@@ -146,6 +212,7 @@ parseVendorId = proc x -> do
   vid <- getAttrValue0 "id" -< vendorID
   maybeComment <- perhaps (getAttrValue0 "comment") -< vendorID
   returnA -< ExtractedVendorId name vid maybeComment
+
 
 parseTag :: ArrowXml a => a XmlTree ExtractedTag
 parseTag = proc x -> do
@@ -155,6 +222,52 @@ parseTag = proc x -> do
   contact <- getAttrValue0 "contact"  -< tag
   returnA -< ExtractedTag name author contact
 
+
+parseFeature :: ArrowXml a => a XmlTree ExtractedFeature
+parseFeature = proc x -> do
+  feature <- extract "feature" -< x
+  api <- getAttrValue0 "api" -< feature
+  name <- getAttrValue0 "name" -< feature
+  number <- getAttrValue0 "number" -< feature
+  requires <- listA $ parseRequire -< feature
+  returnA -< ExtractedFeature api name number requires
+
+
+parseRequire :: ArrowXml a => a XmlTree ExtractedRequire
+parseRequire = proc x -> do
+  require <- extract "require" -< x
+  comment <- perhaps (getAttrValue0 "comment") -< require
+  rtype <- perhaps (listA $ parseRType) -< require
+  renum <- perhaps (listA $ parseREnum) -< require
+  rcommand <- perhaps (listA $ parseRCommand) -< require
+  returnA -< ExtractedRequire comment rtype renum rcommand
+
+
+parseRType :: ArrowXml a => a XmlTree ExtractedRequiredType
+parseRType = proc x -> do
+  rtype <-  extract "type" -< x
+  rtname <- getAttrValue0 "name" -< rtype
+  returnA -< ExtractedRequiredType rtname
+
+
+parseREnum :: ArrowXml a => a XmlTree ExtractedRequiredEnum
+parseREnum = proc x -> do
+  enum <- extract "enum" -< x
+  rename <- getAttrValue0 "name" -< enum
+  revalue <- perhaps (getAttrValue0 "value") -< enum
+  reoffset <- perhaps (getAttrValue0 "offset") -< enum
+  reextends <- perhaps (getAttrValue0 "extends") -< enum
+  redir <- perhaps (getAttrValue0 "dir") -< enum
+  returnA -< ExtractedRequiredEnum rename revalue reoffset reextends redir
+
+
+parseRCommand :: ArrowXml a => a XmlTree ExtractedRequiredCommand
+parseRCommand = proc x -> do
+  command <- extract "command" -< x
+  rcname <- getAttrValue0 "name" -< command
+  returnA -< ExtractedRequiredCommand rcname
+
+
 parseVkXml :: IOSLA (XIOState ()) XmlTree ExtractedRegistry
 parseVkXml = proc x -> do
   registry <- extract "registry" -< x
@@ -162,7 +275,10 @@ parseVkXml = proc x -> do
   tags <- listA $ parseTag <<< extract "tags" -< registry
   enums <- listA $ parseEnums -< registry
   commands <- listA $ parseCommands -< registry
-  returnA -< ExtractedRegistry vendorids tags enums commands
+  feature <- parseFeature -< registry
+  --extensions <- listA $ parseExtension <<< extract "extensions" -< registry
+  returnA -< ExtractedRegistry vendorids tags enums commands feature
+
 
 main :: IO ()
 main = do
