@@ -7,11 +7,11 @@ bug-reports:              https://github.com/oldmanmike/vulkan/issues
 license:                  BSD3
 license-file:             LICENSE
 author:                   Michael Carpenter
-maintainer:               Michael Carpenter <mcarpenter.dev@gmail.com>
+maintainer:               Michael Carpenter <oldmanmike.dev@gmail.com>
 copyright:                Copyright (C) 2016 Michael Carpenter
 category:                 Graphics
 build-type:               Simple
-extra-source-files:       README.md, LICENSE
+extra-source-files:       README.md, LICENSE, vk.xml, vkspec.pdf
 cabal-version:            >=1.10
 
 library
