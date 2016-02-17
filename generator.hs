@@ -29,6 +29,9 @@ data ExtractedCommands = ExtractedCommands
 data ExtractedCommand = ExtractedCommand
   { _cSuccessCodes    :: Maybe String
   , _cErrorCodes      :: Maybe String
+  , _cQueues          :: Maybe String
+  , _cRenderpass      :: Maybe String
+  , _cCmdbufferLevel  :: Maybe String
   , _cProtoName       :: String
   , _cProtoType       :: ExtractedType
   , _cParams          :: [ExtractedParam]
@@ -40,11 +43,12 @@ data ExtractedValidity = ExtractedValidity
   } deriving (Show,Eq)
 
 data ExtractedParam = ExtractedParam
-  { _parName        :: String
-  , _parType        :: ExtractedType
-  , _parOptional    :: Maybe String
-  , _parLen         :: Maybe String
-  , _parExternSync  :: Maybe String
+  { _parName            :: String
+  , _parType            :: ExtractedType
+  , _parOptional        :: Maybe String
+  , _parLen             :: Maybe String
+  , _parExternSync      :: Maybe String
+  , _parNoAutoValidity  :: Maybe String
   } deriving (Show,Eq)
 
 data ExtractedType = ExtractedType
@@ -69,11 +73,14 @@ parseCommand = proc x -> do
   command <- extract "command" -< x
   maybeSuccessCode <- perhaps (getAttrValue0 "successcodes") -< command
   maybeErrorCode <- perhaps (getAttrValue0 "errorcodes") -< command
+  maybeQueues <- perhaps (getAttrValue0 "queues") -< command
+  maybeRenderpass <- perhaps (getAttrValue0 "renderpass") -< command
+  maybeCmdbufferlevel <- perhaps (getAttrValue0 "cmdbufferlevel") -< command
   name <- getText <<< getChildren <<< extract "name" <<< extract "proto" -< command
   cType <- parseType <<< extract "proto" -< command
   params <- listA $ parseParam -< command
   maybeValidity <- parseValidity -< command
-  returnA -< ExtractedCommand maybeSuccessCode maybeErrorCode name cType params maybeValidity
+  returnA -< ExtractedCommand maybeSuccessCode maybeErrorCode maybeQueues maybeRenderpass maybeCmdbufferlevel name cType params maybeValidity
 
 parseValidity :: ArrowXml a => a XmlTree ExtractedValidity
 parseValidity = proc x -> do
@@ -95,7 +102,8 @@ parseParam = proc x -> do
   pOptional <- perhaps (getAttrValue0 "optional") -< param
   pLen <- perhaps (getAttrValue0 "len") -< param
   pExternSync <- perhaps (getAttrValue0 "externsync") -< param
-  returnA -< ExtractedParam pName pType pOptional pLen pExternSync
+  pNoAutoValidity <- perhaps (getAttrValue0 "noautovalidity") -< param
+  returnA -< ExtractedParam pName pType pOptional pLen pExternSync pNoAutoValidity
 
 parseEnums :: ArrowXml a => a XmlTree ExtractedEnums
 parseEnums = proc x -> do
