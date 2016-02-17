@@ -2,8 +2,22 @@
 import Text.XML.HXT.Core
 
 data ExtractedRegistry = ExtractedRegistry
-  { _registryEnums :: [ExtractedEnums]
-  , _registryCommands :: [ExtractedCommands]
+  { _registryVendorId   :: ExtractedVendorId
+  , _registryTags       :: [ExtractedTag]
+  , _registryEnums      :: [ExtractedEnums]
+  , _registryCommands   :: [ExtractedCommands]
+  } deriving (Show,Eq)
+
+data ExtractedVendorId = ExtractedVendorId
+  { _vName      :: String
+  , _vId        :: String
+  , _vComment   :: Maybe String
+  } deriving (Show,Eq)
+
+data ExtractedTag = ExtractedTag
+  { _tName      :: String
+  , _tAuthor    :: String
+  , _tContact   :: String
   } deriving (Show,Eq)
 
 data ExtractedEnums = ExtractedEnums
@@ -125,12 +139,30 @@ parseEnum = proc x -> do
   maybeEComment <- perhaps (getAttrValue0 "comment") -< enum
   returnA -< ExtractedEnum name maybeEValue maybeEBitpos maybeEComment
 
+parseVendorId :: ArrowXml a => a XmlTree ExtractedVendorId
+parseVendorId = proc x -> do
+  vendorID <- extract "vendorid" -< x
+  name <- getAttrValue0 "name" -< vendorID
+  vid <- getAttrValue0 "id" -< vendorID
+  maybeComment <- perhaps (getAttrValue0 "comment") -< vendorID
+  returnA -< ExtractedVendorId name vid maybeComment
+
+parseTag :: ArrowXml a => a XmlTree ExtractedTag
+parseTag = proc x -> do
+  tag <- extract "tag" -< x
+  name <- getAttrValue0 "name" -< tag
+  author <- getAttrValue0 "author" -< tag
+  contact <- getAttrValue0 "contact"  -< tag
+  returnA -< ExtractedTag name author contact
+
 parseVkXml :: IOSLA (XIOState ()) XmlTree ExtractedRegistry
 parseVkXml = proc x -> do
   registry <- extract "registry" -< x
+  vendorids <- parseVendorId <<< extract "vendorids" -< registry
+  tags <- listA $ parseTag <<< extract "tags" -< registry
   enums <- listA $ parseEnums -< registry
   commands <- listA $ parseCommands -< registry
-  returnA -< ExtractedRegistry enums commands
+  returnA -< ExtractedRegistry vendorids tags enums commands
 
 main :: IO ()
 main = do
