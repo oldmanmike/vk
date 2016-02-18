@@ -9,6 +9,7 @@ import Data.Maybe
 data ExtractedRegistry = ExtractedRegistry
   { registryVendorId   :: ExtractedVendorId
   , registryTags       :: [ExtractedTag]
+  , registryStructs    :: [ExtractedStruct]
   , registryEnums      :: [ExtractedEnums]
   , registryCommands   :: [ExtractedCommands]
   , registryFeature    :: ExtractedFeature
@@ -134,6 +135,21 @@ data ExtractedExtension = ExtractedExtension
   , extCommand :: [ExtractedRequiredCommand]
   } deriving (Show,Eq)
 
+
+data ExtractedStruct = ExtractedStruct
+  { sName               :: String
+  , sMembers            :: [ExtractedMember]
+  , sMaybeReturnedOnly  :: Maybe String
+  , sMaybeValidity      :: Maybe ExtractedValidity
+  } deriving (Show,Eq)
+
+data ExtractedMember = ExtractedMember
+  { mType           :: String
+  , mName           :: String
+  , mOptional       :: Maybe String
+  , mLen            :: Maybe String
+  , mNoautoValidity :: Maybe String
+  } deriving (Show,Eq)
 
 extract :: ArrowXml a => String -> a XmlTree XmlTree
 extract name = hasName name <<< isElem <<< getChildren
@@ -291,16 +307,38 @@ parseExtension = proc x -> do
   returnA -< ExtractedExtension name number supported maybeProtect maybeAuthor maybeContact maybeTypes maybeEnums maybeCommand
 
 
+parseStruct :: ArrowXml a => a XmlTree ExtractedStruct
+parseStruct = proc x -> do
+  struct <- hasAttrValue "category" (=="struct") <<< getChildren <<< extract "types" -< x
+  name <- getAttrValue0 "name" -< struct
+  members <- listA $ parseMember -< struct
+  maybeReturnedOnly <- perhaps (getAttrValue0 "returnedonly") -< struct
+  maybeValidity <- perhaps $ parseValidity -< struct
+  returnA -< ExtractedStruct name members maybeReturnedOnly maybeValidity
+
+
+parseMember :: ArrowXml a => a XmlTree ExtractedMember
+parseMember = proc x -> do
+  member <- extract "member" -< x
+  memberType <- getText <<< getChildren <<< extract "type" -< member
+  memberName <- getText <<< getChildren <<< extract "name" -< member
+  maybeOptional <- perhaps (getAttrValue0 "optional") -< member
+  maybeLen <- perhaps (getAttrValue0 "len") -< member
+  maybeNoautoValidity <- perhaps (getAttrValue0 "noautovalidity") -< member
+  returnA -< ExtractedMember memberType memberName maybeOptional maybeLen maybeNoautoValidity
+
+
 parseVkXml :: IOSLA (XIOState ()) XmlTree ExtractedRegistry
 parseVkXml = proc x -> do
   registry <- extract "registry" -< x
   vendorids <- parseVendorId <<< extract "vendorids" -< registry
   tags <- listA $ parseTag <<< extract "tags" -< registry
+  structs <- listA $ parseStruct -< registry
   enums <- listA $ parseEnums -< registry
   commands <- listA $ parseCommands -< registry
   feature <- parseFeature -< registry
   extensions <- listA $ parseExtension <<< extract "extensions" -< registry
-  returnA -< ExtractedRegistry vendorids tags enums commands feature extensions
+  returnA -< ExtractedRegistry vendorids tags structs enums commands feature extensions
 
 
 toCamelCase :: String -> String
@@ -312,17 +350,19 @@ enum2pattern typeName enumName =
   "pattern " ++ (toCamelCase enumName) ++ " = " ++ "(#const " ++ enumName ++ ") :: " ++ typeName ++ "\n"
 
 
-languageExtensions :: [String]
-languageExtensions = ["{-# LANGUAGE CPP #-}\n"
+vkEnumFFILanguageExtensions :: [String]
+vkEnumFFILanguageExtensions = ["{-# LANGUAGE CPP #-}\n"
                      ,"{-# LANGUAGE ForeignFunctionInterface #-}\n"
                      ,"{-# LANGUAGE ScopedTypeVariables #-}\n"
                      ,"{-# LANGUAGE PatternSynonyms #-}\n"]
 
-moduleDeclaration :: [String] -> [String]
-moduleDeclaration ex = ["module Vulkan.Enum (\n"] ++ ex ++ [") where\n"]
 
-exports :: [ExtractedEnums] -> [String]
-exports e = exportEnumTypes ++ exportPatterns
+vkEnumFFIModuleDeclaration :: [String] -> [String]
+vkEnumFFIModuleDeclaration ex = ["module Vulkan.Enum (\n"] ++ ex ++ [") where\n"]
+
+
+vkEnumFFIExports :: [ExtractedEnums] -> [String]
+vkEnumFFIExports e = exportEnumTypes ++ exportPatterns
     where eFields = concatMap enumsEnumFields e
           enumNames = map enumName eFields
           enumTypes = map enumsName e
@@ -330,34 +370,34 @@ exports e = exportEnumTypes ++ exportPatterns
           exportPatterns = map (\x -> "  pattern " ++ (toCamelCase x) ++",\n") enumNames
 
 
-
 vkHeaderInclude :: String
 vkHeaderInclude = "#include \"vulkan.h\"\n"
 
-imports :: [String]
-imports = ["import Data.Int\n"
-          ,"import Data.Word\n"
-          ,"import Foreign.C.Types\n" ]
 
-enumTypes :: ExtractedEnums -> String
-enumTypes e = "type " ++ enumsName e ++ " = " ++ "(#type " ++ enumsName e ++ ")\n"
+vkEnumFFIImports :: [String]
+vkEnumFFIImports = [ "import Data.Int\n"
+                 , "import Data.Word\n" ]
 
 
-patterns :: ExtractedEnums -> [String]
-patterns e = map (enum2pattern $ enumsName e) (map enumName $ enumsEnumFields e)
+vkEnumTypes :: ExtractedEnums -> String
+vkEnumTypes e = "type " ++ enumsName e ++ " = " ++ "(#type " ++ enumsName e ++ ")\n"
 
 
-enumBindings :: [ExtractedEnums] -> [String]
-enumBindings e = languageExtensions
-                 ++ moduleDeclaration (exports e)
-                 ++ ["\n"]
-                 ++ imports
-                 ++ ["\n"]
-                 ++ [vkHeaderInclude]
-                 ++ ["\n"]
-                 ++ (map enumTypes e)
-                 ++ ["\n"]
-                 ++ concat (intersperse ["\n"] (map patterns e))
+vkFFIPatterns :: ExtractedEnums -> [String]
+vkFFIPatterns e = map (enum2pattern $ enumsName e) (map enumName $ enumsEnumFields e)
+
+
+vkEnumFFIBindings :: [ExtractedEnums] -> [String]
+vkEnumFFIBindings e = vkEnumFFILanguageExtensions
+                      ++ vkEnumFFIModuleDeclaration (vkEnumFFIExports e)
+                      ++ ["\n"]
+                      ++ vkEnumFFIImports
+                      ++ ["\n"]
+                      ++ [vkHeaderInclude]
+                      ++ ["\n"]
+                      ++ (map vkEnumTypes e)
+                      ++ ["\n"]
+                      ++ concat (intersperse ["\n"] (map vkFFIPatterns e))
 
 
 getVkEnums :: ExtractedRegistry -> [ExtractedEnums]
@@ -374,4 +414,6 @@ main :: IO ()
 main = do
   registry <- runVkParser
   let enums = getVkEnums registry
-  writeFile "src/Vulkan/Enum.hsc" (concat $ enumBindings enums)
+  let structs = registryStructs registry
+  --print structs
+  writeFile "src/Vulkan/Enum.hsc" (concat $ vkEnumFFIBindings enums)
