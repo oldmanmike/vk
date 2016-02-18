@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE PatternSynonyms #-}
 module Vulkan.Enum (
@@ -496,7 +498,51 @@ module Vulkan.Enum (
   pattern VkDebugReportErrorCallbackRefExt,
 ) where
 
+import Data.Int
+import Data.Word
+import Foreign.C.Types
+
 #include "vulkan.h"
+
+type VkImageLayout = (#type VkImageLayout)
+type VkAttachmentLoadOp = (#type VkAttachmentLoadOp)
+type VkAttachmentStoreOp = (#type VkAttachmentStoreOp)
+type VkImageType = (#type VkImageType)
+type VkImageTiling = (#type VkImageTiling)
+type VkImageViewType = (#type VkImageViewType)
+type VkCommandBufferLevel = (#type VkCommandBufferLevel)
+type VkComponentSwizzle = (#type VkComponentSwizzle)
+type VkDescriptorType = (#type VkDescriptorType)
+type VkQueryType = (#type VkQueryType)
+type VkBorderColor = (#type VkBorderColor)
+type VkPipelineBindPoint = (#type VkPipelineBindPoint)
+type VkPipelineCacheHeaderVersion = (#type VkPipelineCacheHeaderVersion)
+type VkPrimitiveTopology = (#type VkPrimitiveTopology)
+type VkSharingMode = (#type VkSharingMode)
+type VkIndexType = (#type VkIndexType)
+type VkFilter = (#type VkFilter)
+type VkSamplerMipmapMode = (#type VkSamplerMipmapMode)
+type VkSamplerAddressMode = (#type VkSamplerAddressMode)
+type VkCompareOp = (#type VkCompareOp)
+type VkPolygonMode = (#type VkPolygonMode)
+type VkFrontFace = (#type VkFrontFace)
+type VkBlendFactor = (#type VkBlendFactor)
+type VkBlendOp = (#type VkBlendOp)
+type VkStencilOp = (#type VkStencilOp)
+type VkLogicOp = (#type VkLogicOp)
+type VkInternalAllocationType = (#type VkInternalAllocationType)
+type VkSystemAllocationScope = (#type VkSystemAllocationScope)
+type VkPhysicalDeviceType = (#type VkPhysicalDeviceType)
+type VkVertexInputRate = (#type VkVertexInputRate)
+type VkFormat = (#type VkFormat)
+type VkStructureType = (#type VkStructureType)
+type VkSubpassContents = (#type VkSubpassContents)
+type VkResult = (#type VkResult)
+type VkDynamicState = (#type VkDynamicState)
+type VkPresentModeKHR = (#type VkPresentModeKHR)
+type VkColorSpaceKHR = (#type VkColorSpaceKHR)
+type VkDebugReportObjectTypeEXT = (#type VkDebugReportObjectTypeEXT)
+type VkDebugReportErrorEXT = (#type VkDebugReportErrorEXT)
 
 pattern VkImageLayoutUndefined = (#const VK_IMAGE_LAYOUT_UNDEFINED) :: VkImageLayout
 pattern VkImageLayoutGeneral = (#const VK_IMAGE_LAYOUT_GENERAL) :: VkImageLayout

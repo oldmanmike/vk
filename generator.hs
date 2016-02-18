@@ -3,6 +3,7 @@ import Text.XML.HXT.Core
 import Data.Char
 import Data.List
 import Data.List.Split
+import Data.Maybe
 
 
 data ExtractedRegistry = ExtractedRegistry
@@ -312,7 +313,9 @@ enum2pattern typeName enumName =
 
 
 languageExtensions :: [String]
-languageExtensions = ["{-# LANGUAGE ScopedTypeVariables #-}\n"
+languageExtensions = ["{-# LANGUAGE CPP #-}\n"
+                     ,"{-# LANGUAGE ForeignFunctionInterface #-}\n"
+                     ,"{-# LANGUAGE ScopedTypeVariables #-}\n"
                      ,"{-# LANGUAGE PatternSynonyms #-}\n"]
 
 moduleDeclaration :: [String] -> [String]
@@ -324,12 +327,20 @@ exports e = exportEnumTypes ++ exportPatterns
           enumNames = map enumName eFields
           enumTypes = map enumsName e
           exportEnumTypes = map (\x -> "  " ++ x ++ ",\n") enumTypes
-          exportPatterns =  map (\x -> "  pattern " ++ (toCamelCase x) ++",\n") enumNames
+          exportPatterns = map (\x -> "  pattern " ++ (toCamelCase x) ++",\n") enumNames
 
 
 
 vkHeaderInclude :: String
 vkHeaderInclude = "#include \"vulkan.h\"\n"
+
+imports :: [String]
+imports = ["import Data.Int\n"
+          ,"import Data.Word\n"
+          ,"import Foreign.C.Types\n" ]
+
+enumTypes :: ExtractedEnums -> String
+enumTypes e = "type " ++ enumsName e ++ " = " ++ "(#type " ++ enumsName e ++ ")\n"
 
 
 patterns :: ExtractedEnums -> [String]
@@ -340,7 +351,11 @@ enumBindings :: [ExtractedEnums] -> [String]
 enumBindings e = languageExtensions
                  ++ moduleDeclaration (exports e)
                  ++ ["\n"]
+                 ++ imports
+                 ++ ["\n"]
                  ++ [vkHeaderInclude]
+                 ++ ["\n"]
+                 ++ (map enumTypes e)
                  ++ ["\n"]
                  ++ concat (intersperse ["\n"] (map patterns e))
 
@@ -359,4 +374,4 @@ main :: IO ()
 main = do
   registry <- runVkParser
   let enums = getVkEnums registry
-  writeFile "src/Enum.hsc" (concat $ enumBindings enums)
+  writeFile "src/Vulkan/Enum.hsc" (concat $ enumBindings enums)
