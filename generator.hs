@@ -1,119 +1,123 @@
 {-# LANGUAGE Arrows #-}
 import Text.XML.HXT.Core
+import Data.Char
+import Data.List
+import Data.List.Split
+
 
 data ExtractedRegistry = ExtractedRegistry
-  { _registryVendorId   :: ExtractedVendorId
-  , _registryTags       :: [ExtractedTag]
-  , _registryEnums      :: [ExtractedEnums]
-  , _registryCommands   :: [ExtractedCommands]
-  , _registryFeature    :: ExtractedFeature
-  , _registryExtensions :: [ExtractedExtension]
+  { registryVendorId   :: ExtractedVendorId
+  , registryTags       :: [ExtractedTag]
+  , registryEnums      :: [ExtractedEnums]
+  , registryCommands   :: [ExtractedCommands]
+  , registryFeature    :: ExtractedFeature
+  , registryExtensions :: [ExtractedExtension]
   } deriving (Show,Eq)
 
 
 data ExtractedVendorId = ExtractedVendorId
-  { _vName      :: String
-  , _vId        :: String
-  , _vComment   :: Maybe String
+  { vName      :: String
+  , vId        :: String
+  , vComment   :: Maybe String
   } deriving (Show,Eq)
 
 
 data ExtractedTag = ExtractedTag
-  { _tName      :: String
-  , _tAuthor    :: String
-  , _tContact   :: String
+  { tName      :: String
+  , tAuthor    :: String
+  , tContact   :: String
   } deriving (Show,Eq)
 
 
 data ExtractedEnums = ExtractedEnums
-  { _enumsName        :: String
-  , _enumsType        :: Maybe String
-  , _enumsNamespace   :: Maybe String
-  , _enumsExpand      :: Maybe String
-  , _enumsComment     :: Maybe String
-  , _enumsEnumFields  :: [ExtractedEnum]
+  { enumsName        :: String
+  , enumsType        :: Maybe String
+  , enumsNamespace   :: Maybe String
+  , enumsExpand      :: Maybe String
+  , enumsComment     :: Maybe String
+  , enumsEnumFields  :: [ExtractedEnum]
   } deriving (Show,Eq)
 
 
 data ExtractedEnum = ExtractedEnum
-  { _enumName     :: String
-  , _enumValue    :: Maybe String
-  , _enumBitpos   :: Maybe String
-  , _enumComment  :: Maybe String
+  { enumName     :: String
+  , enumValue    :: Maybe String
+  , enumBitpos   :: Maybe String
+  , enumComment  :: Maybe String
   } deriving (Show,Eq)
 
 
 data ExtractedCommands = ExtractedCommands
-  { _commands     :: [ExtractedCommand]
+  { commands     :: [ExtractedCommand]
   } deriving (Show,Eq)
 
 
 data ExtractedCommand = ExtractedCommand
-  { _cSuccessCodes    :: Maybe String
-  , _cErrorCodes      :: Maybe String
-  , _cQueues          :: Maybe String
-  , _cRenderpass      :: Maybe String
-  , _cCmdbufferLevel  :: Maybe String
-  , _cProtoName       :: String
-  , _cProtoType       :: ExtractedType
-  , _cParams          :: [ExtractedParam]
-  , _cValidity        :: ExtractedValidity
+  { cSuccessCodes    :: Maybe String
+  , cErrorCodes      :: Maybe String
+  , cQueues          :: Maybe String
+  , cRenderpass      :: Maybe String
+  , cCmdbufferLevel  :: Maybe String
+  , cProtoName       :: String
+  , cProtoType       :: ExtractedType
+  , cParams          :: [ExtractedParam]
+  , cValidity        :: ExtractedValidity
   } deriving (Show,Eq)
 
 
 data ExtractedValidity = ExtractedValidity
-  { _vUses    :: Maybe [String]
+  { vUses    :: Maybe [String]
   } deriving (Show,Eq)
 
 
 data ExtractedParam = ExtractedParam
-  { _parName            :: String
-  , _parType            :: ExtractedType
-  , _parOptional        :: Maybe String
-  , _parLen             :: Maybe String
-  , _parExternSync      :: Maybe String
-  , _parNoAutoValidity  :: Maybe String
+  { parName            :: String
+  , parType            :: ExtractedType
+  , parOptional        :: Maybe String
+  , parLen             :: Maybe String
+  , parExternSync      :: Maybe String
+  , parNoAutoValidity  :: Maybe String
   } deriving (Show,Eq)
 
 
 data ExtractedType = ExtractedType
-  { _ptypeName :: String
-  , _pPointer  :: Int
+  { ptypeName :: String
+  , pPointer  :: Int
   } deriving (Show,Eq)
 
 
 data ExtractedFeature = ExtractedFeature
-  { _fApi       :: String
-  , _fName      :: String
-  , _fNumber    :: String
-  , _fRequires  :: [ExtractedRequire]
+  { fApi       :: String
+  , fName      :: String
+  , fNumber    :: String
+  , fRequires  :: [ExtractedRequire]
   } deriving (Show,Eq)
 
 
 data ExtractedRequire = ExtractedRequire
-  { _rComment   :: Maybe String
-  , _rTypes     :: Maybe [ExtractedRequiredType]
-  , _rEnums     :: Maybe [ExtractedRequiredEnum]
-  , _rCommands  :: Maybe [ExtractedRequiredCommand]
+  { rComment   :: Maybe String
+  , rTypes     :: Maybe [ExtractedRequiredType]
+  , rEnums     :: Maybe [ExtractedRequiredEnum]
+  , rCommands  :: Maybe [ExtractedRequiredCommand]
   } deriving (Show,Eq)
 
 
 data ExtractedRequiredType = ExtractedRequiredType
-  { _rtName :: String
+  { rtName :: String
   } deriving (Show,Eq)
 
 
 data ExtractedRequiredEnum = ExtractedRequiredEnum
-  { _reName     :: String
-  , _reValue    :: Maybe String
-  , _reOffset   :: Maybe String
-  , _reExtends  :: Maybe String
-  , _reDir      :: Maybe String
+  { reName     :: String
+  , reValue    :: Maybe String
+  , reOffset   :: Maybe String
+  , reExtends  :: Maybe String
+  , reDir      :: Maybe String
   } deriving (Show,Eq)
 
 
 data ExtractedRequiredCommand = ExtractedRequiredCommand
-  { _rcName :: String
+  { rcName :: String
   } deriving (Show,Eq)
 
 
@@ -258,15 +262,15 @@ parseRCommand = proc x -> do
   returnA -< ExtractedRequiredCommand rcname
 
 data ExtractedExtension = ExtractedExtension
-  { _extName :: String
-  , _extNumber :: String
-  , _extSupported :: String
-  , _extProtect :: Maybe String
-  , _extAuthor :: Maybe String
-  , _extContact :: Maybe String
-  , _extTypes :: [ExtractedRequiredType]
-  , _extEnums :: [ExtractedRequiredEnum]
-  , _extCommand :: [ExtractedRequiredCommand]
+  { extName :: String
+  , extNumber :: String
+  , extSupported :: String
+  , extProtect :: Maybe String
+  , extAuthor :: Maybe String
+  , extContact :: Maybe String
+  , extTypes :: [ExtractedRequiredType]
+  , extEnums :: [ExtractedRequiredEnum]
+  , extCommand :: [ExtractedRequiredCommand]
   } deriving (Show,Eq)
 
 parseExtension :: ArrowXml a => a XmlTree ExtractedExtension
@@ -295,7 +299,28 @@ parseVkXml = proc x -> do
   returnA -< ExtractedRegistry vendorids tags enums commands feature extensions
 
 
+toCamelCase :: String -> String
+toCamelCase s = concatMap (\x -> [(toUpper . head $ x)] ++ ((map toLower) . tail $ x)) . splitOn "_" $ s
+
+
+-- extract "registry" >>> extract "types" >>> getChildren >>> hasAttrValue "category" (=="define") >>> getChildren >>> isText >>> getText
+
+typedef2pattern :: String -> String
+typedef2pattern name = "pattern " ++ camlCaseName ++ " = " ++ "(#const " ++ name ++ ")\n"
+  where camlCaseName = toCamelCase name
+
+sectionedBody :: [String] -> String
+sectionedBody = intercalate "\n"
+
+vkHeaderInclude :: String
+vkHeaderInclude = "#include \"vk.h\""
+
 main :: IO ()
 main = do
   result <- runX (readDocument [withRemoveWS yes] "vk.xml" >>> parseVkXml)
-  print result
+  let registry = head result
+  --let s = registryEnums registry
+  --let define = "type " ++ (toCamelCase s) ++ " = (#type " ++ (drop 2 s) ++ ")"
+  --print define
+  --let enums = registryEnums registry
+  return ()
