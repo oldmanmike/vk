@@ -361,7 +361,7 @@ enumBindings e = languageExtensions
 
 
 getVkEnums :: ExtractedRegistry -> [ExtractedEnums]
-getVkEnums registry = filter ((== Just "enum") . enumsType) (registryEnums registry)
+getVkEnums registry = filter ((\x -> ((x == (Just "enum")) || (x == (Just "bitmask")))) . enumsType) (registryEnums registry)
 
 
 runVkParser :: IO ExtractedRegistry
