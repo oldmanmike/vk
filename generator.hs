@@ -121,6 +121,19 @@ data ExtractedRequiredCommand = ExtractedRequiredCommand
   } deriving (Show,Eq)
 
 
+data ExtractedExtension = ExtractedExtension
+  { extName :: String
+  , extNumber :: String
+  , extSupported :: String
+  , extProtect :: Maybe String
+  , extAuthor :: Maybe String
+  , extContact :: Maybe String
+  , extTypes :: [ExtractedRequiredType]
+  , extEnums :: [ExtractedRequiredEnum]
+  , extCommand :: [ExtractedRequiredCommand]
+  } deriving (Show,Eq)
+
+
 extract :: ArrowXml a => String -> a XmlTree XmlTree
 extract name = hasName name <<< isElem <<< getChildren
 
@@ -261,17 +274,6 @@ parseRCommand = proc x -> do
   rcname <- getAttrValue0 "name" -< command
   returnA -< ExtractedRequiredCommand rcname
 
-data ExtractedExtension = ExtractedExtension
-  { extName :: String
-  , extNumber :: String
-  , extSupported :: String
-  , extProtect :: Maybe String
-  , extAuthor :: Maybe String
-  , extContact :: Maybe String
-  , extTypes :: [ExtractedRequiredType]
-  , extEnums :: [ExtractedRequiredEnum]
-  , extCommand :: [ExtractedRequiredCommand]
-  } deriving (Show,Eq)
 
 parseExtension :: ArrowXml a => a XmlTree ExtractedExtension
 parseExtension = proc x -> do
@@ -286,6 +288,7 @@ parseExtension = proc x -> do
   maybeEnums <- listA $ parseREnum <<< extract "require" -< extension
   maybeCommand <- listA $ parseRCommand <<< extract "require" -< extension
   returnA -< ExtractedExtension name number supported maybeProtect maybeAuthor maybeContact maybeTypes maybeEnums maybeCommand
+
 
 parseVkXml :: IOSLA (XIOState ()) XmlTree ExtractedRegistry
 parseVkXml = proc x -> do
@@ -303,24 +306,20 @@ toCamelCase :: String -> String
 toCamelCase s = concatMap (\x -> [(toUpper . head $ x)] ++ ((map toLower) . tail $ x)) . splitOn "_" $ s
 
 
--- extract "registry" >>> extract "types" >>> getChildren >>> hasAttrValue "category" (=="define") >>> getChildren >>> isText >>> getText
-
-typedef2pattern :: String -> String
-typedef2pattern name = "pattern " ++ camlCaseName ++ " = " ++ "(#const " ++ name ++ ")\n"
-  where camlCaseName = toCamelCase name
-
-sectionedBody :: [String] -> String
-sectionedBody = intercalate "\n"
+typedef2pattern :: String -> String -> String
+typedef2pattern typeName enumName =
+  "pattern " ++ (toCamelCase enumName) ++ " = " ++ "(#const " ++ enumName ++ ") :: " ++ typeName ++ "\n"
 
 vkHeaderInclude :: String
-vkHeaderInclude = "#include \"vk.h\""
+vkHeaderInclude = "#include \"vulkan.h\"\n"
+
+buildEnum :: ExtractedEnums -> [String]
+buildEnum e = map (typedef2pattern (enumsName e)) (map enumName $ enumsEnumFields e)
 
 main :: IO ()
 main = do
   result <- runX (readDocument [withRemoveWS yes] "vk.xml" >>> parseVkXml)
   let registry = head result
-  --let s = registryEnums registry
-  --let define = "type " ++ (toCamelCase s) ++ " = (#type " ++ (drop 2 s) ++ ")"
-  --print define
-  --let enums = registryEnums registry
-  return ()
+  let enums = filter ((== Just "enum") . enumsType) (registryEnums registry)
+  let stuff = intercalate ["\n"] $ [vkHeaderInclude] : (map buildEnum enums)
+  writeFile "src/Enum.hsc" (concat stuff)
