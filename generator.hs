@@ -7,6 +7,7 @@ data ExtractedRegistry = ExtractedRegistry
   , _registryEnums      :: [ExtractedEnums]
   , _registryCommands   :: [ExtractedCommands]
   , _registryFeature    :: ExtractedFeature
+  , _registryExtensions :: [ExtractedExtension]
   } deriving (Show,Eq)
 
 
@@ -113,17 +114,6 @@ data ExtractedRequiredEnum = ExtractedRequiredEnum
 
 data ExtractedRequiredCommand = ExtractedRequiredCommand
   { _rcName :: String
-  } deriving (Show,Eq)
-
-
-data ExtractedExtension = ExtractedExtension
-  { _eName      :: String
-  , _eNumber    :: String
-  , _eProtect   :: Maybe String
-  , _eSupported :: String
-  , _eRequire   :: ExtractedRequire
-  , _eAuthor    :: Maybe String
-  , _eContact   :: Maybe String
   } deriving (Show,Eq)
 
 
@@ -267,6 +257,31 @@ parseRCommand = proc x -> do
   rcname <- getAttrValue0 "name" -< command
   returnA -< ExtractedRequiredCommand rcname
 
+data ExtractedExtension = ExtractedExtension
+  { _extName :: String
+  , _extNumber :: String
+  , _extSupported :: String
+  , _extProtect :: Maybe String
+  , _extAuthor :: Maybe String
+  , _extContact :: Maybe String
+  , _extTypes :: [ExtractedRequiredType]
+  , _extEnums :: [ExtractedRequiredEnum]
+  , _extCommand :: [ExtractedRequiredCommand]
+  } deriving (Show,Eq)
+
+parseExtension :: ArrowXml a => a XmlTree ExtractedExtension
+parseExtension = proc x -> do
+  extension <- extract "extension" -< x
+  name <- getAttrValue0 "name" -< extension
+  number <- getAttrValue0 "number" -< extension
+  supported <- getAttrValue0 "supported" -< extension
+  maybeProtect <- perhaps (getAttrValue0 "protect") -< extension
+  maybeAuthor <- perhaps (getAttrValue0 "author") -< extension
+  maybeContact <- perhaps (getAttrValue0 "contact") -< extension
+  maybeTypes <- listA $ parseRType <<< extract "require" -< extension
+  maybeEnums <- listA $ parseREnum <<< extract "require" -< extension
+  maybeCommand <- listA $ parseRCommand <<< extract "require" -< extension
+  returnA -< ExtractedExtension name number supported maybeProtect maybeAuthor maybeContact maybeTypes maybeEnums maybeCommand
 
 parseVkXml :: IOSLA (XIOState ()) XmlTree ExtractedRegistry
 parseVkXml = proc x -> do
@@ -276,8 +291,8 @@ parseVkXml = proc x -> do
   enums <- listA $ parseEnums -< registry
   commands <- listA $ parseCommands -< registry
   feature <- parseFeature -< registry
-  --extensions <- listA $ parseExtension <<< extract "extensions" -< registry
-  returnA -< ExtractedRegistry vendorids tags enums commands feature
+  extensions <- listA $ parseExtension <<< extract "extensions" -< registry
+  returnA -< ExtractedRegistry vendorids tags enums commands feature extensions
 
 
 main :: IO ()
