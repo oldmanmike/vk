@@ -306,20 +306,57 @@ toCamelCase :: String -> String
 toCamelCase s = concatMap (\x -> [(toUpper . head $ x)] ++ ((map toLower) . tail $ x)) . splitOn "_" $ s
 
 
-typedef2pattern :: String -> String -> String
-typedef2pattern typeName enumName =
+enum2pattern :: String -> String -> String
+enum2pattern typeName enumName =
   "pattern " ++ (toCamelCase enumName) ++ " = " ++ "(#const " ++ enumName ++ ") :: " ++ typeName ++ "\n"
+
+
+languageExtensions :: [String]
+languageExtensions = ["{-# LANGUAGE ScopedTypeVariables #-}\n"
+                     ,"{-# LANGUAGE PatternSynonyms #-}\n"]
+
+moduleDeclaration :: [String] -> [String]
+moduleDeclaration ex = ["module Vulkan.Enum (\n"] ++ ex ++ [") where\n"]
+
+exports :: [ExtractedEnums] -> [String]
+exports e = exportEnumTypes ++ exportPatterns
+    where eFields = concatMap enumsEnumFields e
+          enumNames = map enumName eFields
+          enumTypes = map enumsName e
+          exportEnumTypes = map (\x -> "  " ++ x ++ ",\n") enumTypes
+          exportPatterns =  map (\x -> "  pattern " ++ (toCamelCase x) ++",\n") enumNames
+
+
 
 vkHeaderInclude :: String
 vkHeaderInclude = "#include \"vulkan.h\"\n"
 
-buildEnum :: ExtractedEnums -> [String]
-buildEnum e = map (typedef2pattern (enumsName e)) (map enumName $ enumsEnumFields e)
+
+patterns :: ExtractedEnums -> [String]
+patterns e = map (enum2pattern $ enumsName e) (map enumName $ enumsEnumFields e)
+
+
+enumBindings :: [ExtractedEnums] -> [String]
+enumBindings e = languageExtensions
+                 ++ moduleDeclaration (exports e)
+                 ++ ["\n"]
+                 ++ [vkHeaderInclude]
+                 ++ ["\n"]
+                 ++ concat (intersperse ["\n"] (map patterns e))
+
+
+getVkEnums :: ExtractedRegistry -> [ExtractedEnums]
+getVkEnums registry = filter ((== Just "enum") . enumsType) (registryEnums registry)
+
+
+runVkParser :: IO ExtractedRegistry
+runVkParser = do
+  result <- runX (readDocument [withRemoveWS yes] "vk.xml" >>> parseVkXml)
+  return . head $ result
+
 
 main :: IO ()
 main = do
-  result <- runX (readDocument [withRemoveWS yes] "vk.xml" >>> parseVkXml)
-  let registry = head result
-  let enums = filter ((== Just "enum") . enumsType) (registryEnums registry)
-  let stuff = intercalate ["\n"] $ [vkHeaderInclude] : (map buildEnum enums)
-  writeFile "src/Enum.hsc" (concat stuff)
+  registry <- runVkParser
+  let enums = getVkEnums registry
+  writeFile "src/Enum.hsc" (concat $ enumBindings enums)
