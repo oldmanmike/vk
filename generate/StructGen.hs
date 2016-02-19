@@ -8,8 +8,9 @@ module StructGen
   , vkStructFFIBindings
   ) where
 
+import Data.Char
+
 import Types
-import GenUtils
 
 
 vkStructFFIBindings :: [ExtractedStruct] -> String
@@ -52,9 +53,23 @@ vkStructFFIImports = concat
   , "import Data.Word\n" ]
 
 
+fmtField :: String -> String -> String
+fmtField vks1 s2 = ((toLower . head $ s1) : (drop 1 s1)) ++ ((toUpper . head $ s2) : (tail s2))
+  where s1 = drop 2 vks1
+
+
 vkStructDataTypes :: ExtractedStruct -> String
 vkStructDataTypes s =
   ("data " ++ sName s ++ " = " ++ sName s ++ "\n")
-  ++ "  { " ++ (mName . head . sMembers $ s) ++ " :: " ++ (mType . head . sMembers $ s) ++ "\n"
-  ++ concatMap (\x -> "  , " ++ mName x ++ " :: " ++ mType x ++ "\n") (tail . sMembers $ s)
+  ++ "  { " ++ (fmtField (sName s) (mName . head . sMembers $ s)) ++ " :: !(#type " ++ (cTypeAdapter . mType . head . sMembers $ s) ++ ")\n"
+  ++ concatMap (\x -> "  , " ++ (fmtField (sName s) (mName x)) ++ " :: !(#type " ++ (cTypeAdapter . mType $ x) ++ ")\n") (tail . sMembers $ s)
   ++ "  }\n\n"
+
+cTypeAdapter :: String -> String
+cTypeAdapter "char" = "CChar"
+cTypeAdapter "float" = "CFloat"
+cTypeAdapter "uint32_t" = "Word32"
+cTypeAdapter "int32_t" = "Int32"
+cTypeAdapter "size_t" = "CSize"
+cTypeAdapter "void" = "Ptr ()"
+cTypeAdapter s = s

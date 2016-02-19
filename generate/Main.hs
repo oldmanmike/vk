@@ -1,5 +1,3 @@
-module Generator where
-
 import EnumGen
 import StructGen
 import Parser
@@ -11,5 +9,5 @@ main = do
   let enums = getVkEnums registry
   let structs = registryStructs registry
   --print structs
-  writeFile "src/Vulkan/Enum.hsc" $ vkEnumFFIBindings enums
-  writeFile "src/Vulkan/Struct.hsc" $ vkStructFFIBindings structs
+  writeFile "Enum.hsc" $ vkEnumFFIBindings enums
+  writeFile "Struct.hsc" $ vkStructFFIBindings structs
