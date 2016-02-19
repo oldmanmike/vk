@@ -26,12 +26,6 @@ import Data.List
 import Data.List.Split
 import Data.Maybe
 
-data EnumSection = EnumSection
-  { enumSectionBaseTypes    :: [ExtractedBaseType]
-  , enumSectionHandles      :: [ExtractedHandle]
-  , enumSectionDefines      :: [ExtractedDefine]
-  , enumSectionApiConsts    :: ExtractedEnums
-
 
 data ExtractedRegistry = ExtractedRegistry
   { registryVendorId   :: ExtractedVendorId
