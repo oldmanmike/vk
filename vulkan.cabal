@@ -23,8 +23,12 @@ library
     default-language:     Haskell2010
 
 executable generator
-    main-is:              generator.hs
+    hs-source-dirs:       gen
+    main-is:              Generator.hs
     ghc-options:          -Wall
+    other-modules:        EnumGen
+                          Parser
+                          Types
     build-depends:        base,
                           hxt,
                           split

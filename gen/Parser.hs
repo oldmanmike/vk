@@ -1,155 +1,35 @@
 {-# LANGUAGE Arrows #-}
+module Parser
+  ( extract
+  , perhaps
+  , parseCommands
+  , parseCommand
+  , parseValidity
+  , parseType
+  , parseParam
+  , parseEnums
+  , parseEnum
+  , parseVendorId
+  , parseTag
+  , parseFeature
+  , parseRequire
+  , parseRType
+  , parseREnum
+  , parseRCommand
+  , parseExtension
+  , parseStruct
+  , parseMember
+  , parseVkXml
+  , runVkParser
+  ) where
+
 import Text.XML.HXT.Core
 import Data.Char
 import Data.List
 import Data.List.Split
 import Data.Maybe
 
-
-data ExtractedRegistry = ExtractedRegistry
-  { registryVendorId   :: ExtractedVendorId
-  , registryTags       :: [ExtractedTag]
-  , registryStructs    :: [ExtractedStruct]
-  , registryEnums      :: [ExtractedEnums]
-  , registryCommands   :: [ExtractedCommands]
-  , registryFeature    :: ExtractedFeature
-  , registryExtensions :: [ExtractedExtension]
-  } deriving (Show,Eq)
-
-
-data ExtractedVendorId = ExtractedVendorId
-  { vName      :: String
-  , vId        :: String
-  , vComment   :: Maybe String
-  } deriving (Show,Eq)
-
-
-data ExtractedTag = ExtractedTag
-  { tName      :: String
-  , tAuthor    :: String
-  , tContact   :: String
-  } deriving (Show,Eq)
-
-
-data ExtractedEnums = ExtractedEnums
-  { enumsName        :: String
-  , enumsType        :: Maybe String
-  , enumsNamespace   :: Maybe String
-  , enumsExpand      :: Maybe String
-  , enumsComment     :: Maybe String
-  , enumsEnumFields  :: [ExtractedEnum]
-  } deriving (Show,Eq)
-
-
-data ExtractedEnum = ExtractedEnum
-  { enumName     :: String
-  , enumValue    :: Maybe String
-  , enumBitpos   :: Maybe String
-  , enumComment  :: Maybe String
-  } deriving (Show,Eq)
-
-
-data ExtractedCommands = ExtractedCommands
-  { commands     :: [ExtractedCommand]
-  } deriving (Show,Eq)
-
-
-data ExtractedCommand = ExtractedCommand
-  { cSuccessCodes    :: Maybe String
-  , cErrorCodes      :: Maybe String
-  , cQueues          :: Maybe String
-  , cRenderpass      :: Maybe String
-  , cCmdbufferLevel  :: Maybe String
-  , cProtoName       :: String
-  , cProtoType       :: ExtractedType
-  , cParams          :: [ExtractedParam]
-  , cValidity        :: ExtractedValidity
-  } deriving (Show,Eq)
-
-
-data ExtractedValidity = ExtractedValidity
-  { vUses    :: Maybe [String]
-  } deriving (Show,Eq)
-
-
-data ExtractedParam = ExtractedParam
-  { parName            :: String
-  , parType            :: ExtractedType
-  , parOptional        :: Maybe String
-  , parLen             :: Maybe String
-  , parExternSync      :: Maybe String
-  , parNoAutoValidity  :: Maybe String
-  } deriving (Show,Eq)
-
-
-data ExtractedType = ExtractedType
-  { ptypeName :: String
-  , pPointer  :: Int
-  } deriving (Show,Eq)
-
-
-data ExtractedFeature = ExtractedFeature
-  { fApi       :: String
-  , fName      :: String
-  , fNumber    :: String
-  , fRequires  :: [ExtractedRequire]
-  } deriving (Show,Eq)
-
-
-data ExtractedRequire = ExtractedRequire
-  { rComment   :: Maybe String
-  , rTypes     :: Maybe [ExtractedRequiredType]
-  , rEnums     :: Maybe [ExtractedRequiredEnum]
-  , rCommands  :: Maybe [ExtractedRequiredCommand]
-  } deriving (Show,Eq)
-
-
-data ExtractedRequiredType = ExtractedRequiredType
-  { rtName :: String
-  } deriving (Show,Eq)
-
-
-data ExtractedRequiredEnum = ExtractedRequiredEnum
-  { reName     :: String
-  , reValue    :: Maybe String
-  , reOffset   :: Maybe String
-  , reExtends  :: Maybe String
-  , reDir      :: Maybe String
-  } deriving (Show,Eq)
-
-
-data ExtractedRequiredCommand = ExtractedRequiredCommand
-  { rcName :: String
-  } deriving (Show,Eq)
-
-
-data ExtractedExtension = ExtractedExtension
-  { extName :: String
-  , extNumber :: String
-  , extSupported :: String
-  , extProtect :: Maybe String
-  , extAuthor :: Maybe String
-  , extContact :: Maybe String
-  , extTypes :: [ExtractedRequiredType]
-  , extEnums :: [ExtractedRequiredEnum]
-  , extCommand :: [ExtractedRequiredCommand]
-  } deriving (Show,Eq)
-
-
-data ExtractedStruct = ExtractedStruct
-  { sName               :: String
-  , sMembers            :: [ExtractedMember]
-  , sMaybeReturnedOnly  :: Maybe String
-  , sMaybeValidity      :: Maybe ExtractedValidity
-  } deriving (Show,Eq)
-
-data ExtractedMember = ExtractedMember
-  { mType           :: String
-  , mName           :: String
-  , mOptional       :: Maybe String
-  , mLen            :: Maybe String
-  , mNoautoValidity :: Maybe String
-  } deriving (Show,Eq)
+import Types
 
 extract :: ArrowXml a => String -> a XmlTree XmlTree
 extract name = hasName name <<< isElem <<< getChildren
@@ -341,79 +221,7 @@ parseVkXml = proc x -> do
   returnA -< ExtractedRegistry vendorids tags structs enums commands feature extensions
 
 
-toCamelCase :: String -> String
-toCamelCase s = concatMap (\x -> [(toUpper . head $ x)] ++ ((map toLower) . tail $ x)) . splitOn "_" $ s
-
-
-enum2pattern :: String -> String -> String
-enum2pattern typeName enumName =
-  "pattern " ++ (toCamelCase enumName) ++ " = " ++ "(#const " ++ enumName ++ ") :: " ++ typeName ++ "\n"
-
-
-vkEnumFFILanguageExtensions :: [String]
-vkEnumFFILanguageExtensions = ["{-# LANGUAGE CPP #-}\n"
-                     ,"{-# LANGUAGE ForeignFunctionInterface #-}\n"
-                     ,"{-# LANGUAGE ScopedTypeVariables #-}\n"
-                     ,"{-# LANGUAGE PatternSynonyms #-}\n"]
-
-
-vkEnumFFIModuleDeclaration :: [String] -> [String]
-vkEnumFFIModuleDeclaration ex = ["module Vulkan.Enum (\n"] ++ ex ++ [") where\n"]
-
-
-vkEnumFFIExports :: [ExtractedEnums] -> [String]
-vkEnumFFIExports e = exportEnumTypes ++ exportPatterns
-    where eFields = concatMap enumsEnumFields e
-          enumNames = map enumName eFields
-          enumTypes = map enumsName e
-          exportEnumTypes = map (\x -> "  " ++ x ++ ",\n") enumTypes
-          exportPatterns = map (\x -> "  pattern " ++ (toCamelCase x) ++",\n") enumNames
-
-
-vkHeaderInclude :: String
-vkHeaderInclude = "#include \"vulkan.h\"\n"
-
-
-vkEnumFFIImports :: [String]
-vkEnumFFIImports = [ "import Data.Int\n"
-                 , "import Data.Word\n" ]
-
-
-vkEnumTypes :: ExtractedEnums -> String
-vkEnumTypes e = "type " ++ enumsName e ++ " = " ++ "(#type " ++ enumsName e ++ ")\n"
-
-
-vkFFIPatterns :: ExtractedEnums -> [String]
-vkFFIPatterns e = map (enum2pattern $ enumsName e) (map enumName $ enumsEnumFields e)
-
-
-vkEnumFFIBindings :: [ExtractedEnums] -> [String]
-vkEnumFFIBindings e = vkEnumFFILanguageExtensions
-                      ++ vkEnumFFIModuleDeclaration (vkEnumFFIExports e)
-                      ++ ["\n"]
-                      ++ vkEnumFFIImports
-                      ++ ["\n"]
-                      ++ [vkHeaderInclude]
-                      ++ ["\n"]
-                      ++ (map vkEnumTypes e)
-                      ++ ["\n"]
-                      ++ concat (intersperse ["\n"] (map vkFFIPatterns e))
-
-
-getVkEnums :: ExtractedRegistry -> [ExtractedEnums]
-getVkEnums registry = filter ((\x -> ((x == (Just "enum")) || (x == (Just "bitmask")))) . enumsType) (registryEnums registry)
-
-
 runVkParser :: IO ExtractedRegistry
 runVkParser = do
   result <- runX (readDocument [withRemoveWS yes] "vk.xml" >>> parseVkXml)
   return . head $ result
-
-
-main :: IO ()
-main = do
-  registry <- runVkParser
-  let enums = getVkEnums registry
-  let structs = registryStructs registry
-  --print structs
-  writeFile "src/Vulkan/Enum.hsc" (concat $ vkEnumFFIBindings enums)
