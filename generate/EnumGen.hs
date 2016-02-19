@@ -38,7 +38,7 @@ getVkEnums registry = filter ((\x -> ((x == (Just "enum")) || (x == (Just "bitma
 
 enum2pattern :: String -> String -> String
 enum2pattern typeName enumName =
-  "pattern " ++ (toCamelCase enumName) ++ " = " ++ "(#const " ++ enumName ++ ") :: " ++ typeName ++ "\n"
+  "pattern " ++ enumName ++ " = " ++ "(#const " ++ enumName ++ ") :: " ++ typeName ++ "\n"
 
 
 vkEnumFFILanguageExtensions :: String
@@ -59,11 +59,11 @@ vkEnumFFIExports e = concat $ exportEnumTypes ++ exportPatterns
           enumNames = map enumName eFields
           enumTypes = map enumsName e
           exportEnumTypes = map (\x -> "  " ++ x ++ ",\n") enumTypes
-          exportPatterns = map (\x -> "  pattern " ++ (toCamelCase x) ++",\n") enumNames
+          exportPatterns = map (\x -> "  pattern " ++ x ++",\n") enumNames
 
 
 vkHeaderInclude :: String
-vkHeaderInclude = "#include \"vulkan.h\"\n"
+vkHeaderInclude = "#include <vulkan/vulkan.h>\n"
 
 
 vkEnumFFIImports :: String

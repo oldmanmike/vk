@@ -38,7 +38,7 @@ vkStructFFIModuleDeclaration x = "module Vulkan.Struct\n" ++ x ++ "  ) where\n"
 
 
 vkStructHeaderInclude :: String
-vkStructHeaderInclude = "#include \"vulkan.h\"\n"
+vkStructHeaderInclude = "#include <vulkan/vulkan.h>\n"
 
 
 vkStructFFIExports :: [ExtractedStruct] -> String
