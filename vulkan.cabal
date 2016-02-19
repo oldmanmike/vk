@@ -27,7 +27,9 @@ executable generator
     main-is:              Generator.hs
     ghc-options:          -Wall
     other-modules:        EnumGen
+                          GenUtils
                           Parser
+                          StructGen
                           Types
     build-depends:        base,
                           hxt,
