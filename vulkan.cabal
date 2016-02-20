@@ -19,8 +19,11 @@ library
     ghc-options:          -Wall
     exposed-modules:      Vulkan
                           Vulkan.Enum
+                          Vulkan.FunctionPointer
+                          Vulkan.Struct
                           Vulkan.Types
-    build-depends:        base >= 4.7 && < 5
+    build-depends:        base >= 4.7 && < 5,
+                          transformers
     default-language:     Haskell2010
 
 executable gen
