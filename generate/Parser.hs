@@ -2,7 +2,6 @@
 module Parser
   ( extract
   , perhaps
-  , parseCommands
   , parseCommand
   , parseValidity
   , parseType
@@ -37,13 +36,6 @@ extract name = hasName name <<< isElem <<< getChildren
 
 perhaps :: ArrowIf a => a b c -> a b (Maybe c)
 perhaps x = (arr Just <<< x) `orElse` constA Nothing
-
-
-parseCommands :: ArrowXml a => a XmlTree ExtractedCommands
-parseCommands = proc x -> do
-  commandsblock <- extract "commands" -< x
-  commands <- listA $ parseCommand -< commandsblock
-  returnA -< ExtractedCommands commands
 
 
 parseCommand :: ArrowXml a => a XmlTree ExtractedCommand
@@ -222,7 +214,7 @@ parseVkXml = proc x -> do
   structs <- listA $ parseStruct -< registry
   enums <- listA $ parseEnums -< registry
   funcPointers <- listA $ parseFuncPointer <<< hasAttrValue "category" (=="funcpointer") <<< getChildren <<< extract "types" -< registry
-  commands <- listA $ parseCommands -< registry
+  commands <- listA $ parseCommand <<< extract "commands" -< registry
   feature <- parseFeature -< registry
   extensions <- listA $ parseExtension <<< extract "extensions" -< registry
   returnA -< ExtractedRegistry vendorids tags structs funcPointers enums commands feature extensions

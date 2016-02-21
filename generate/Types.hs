@@ -5,7 +5,6 @@ module Types
   , ExtractedTag (..)
   , ExtractedEnums (..)
   , ExtractedEnum (..)
-  , ExtractedCommands (..)
   , ExtractedCommand (..)
   , ExtractedValidity (..)
   , ExtractedParam (..)
@@ -34,7 +33,7 @@ data ExtractedRegistry = ExtractedRegistry
   , registryStructs       :: [ExtractedStruct]
   , registryFuncPointers  :: [ExtractedFuncPointer]
   , registryEnums         :: [ExtractedEnums]
-  , registryCommands      :: [ExtractedCommands]
+  , registryCommands      :: [ExtractedCommand]
   , registryFeature       :: ExtractedFeature
   , registryExtensions    :: [ExtractedExtension]
   } deriving (Show,Eq)
@@ -69,11 +68,6 @@ data ExtractedEnum = ExtractedEnum
   , enumValue    :: Maybe String
   , enumBitpos   :: Maybe String
   , enumComment  :: Maybe String
-  } deriving (Show,Eq)
-
-
-data ExtractedCommands = ExtractedCommands
-  { commands     :: [ExtractedCommand]
   } deriving (Show,Eq)
 
 
