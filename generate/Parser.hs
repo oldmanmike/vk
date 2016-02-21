@@ -207,6 +207,12 @@ parseMember = proc x -> do
   maybeNoautoValidity <- perhaps (getAttrValue0 "noautovalidity") -< member
   returnA -< ExtractedMember memberType memberName maybeOptional maybeLen maybeNoautoValidity
 
+parseFuncPointer :: ArrowXml a => a XmlTree ExtractedFuncPointer
+parseFuncPointer = proc funcPointer -> do
+  name <- getText <<< getChildren <<< hasName "name" <<< getChildren -< funcPointer
+  args <- listA $ getText <<< getChildren -< funcPointer
+  argTypes <- listA $ getText <<< getChildren <<< extract "type" -< funcPointer
+  returnA -< ExtractedFuncPointer name argTypes args
 
 parseVkXml :: IOSLA (XIOState ()) XmlTree ExtractedRegistry
 parseVkXml = proc x -> do
@@ -215,10 +221,11 @@ parseVkXml = proc x -> do
   tags <- listA $ parseTag <<< extract "tags" -< registry
   structs <- listA $ parseStruct -< registry
   enums <- listA $ parseEnums -< registry
+  funcPointers <- listA $ parseFuncPointer <<< hasAttrValue "category" (=="funcpointer") <<< getChildren <<< extract "types" -< registry
   commands <- listA $ parseCommands -< registry
   feature <- parseFeature -< registry
   extensions <- listA $ parseExtension <<< extract "extensions" -< registry
-  returnA -< ExtractedRegistry vendorids tags structs enums commands feature extensions
+  returnA -< ExtractedRegistry vendorids tags structs funcPointers enums commands feature extensions
 
 
 runVkParser :: IO ExtractedRegistry

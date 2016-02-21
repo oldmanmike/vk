@@ -18,6 +18,7 @@ module Types
   , ExtractedExtension (..)
   , ExtractedStruct (..)
   , ExtractedMember (..)
+  , ExtractedFuncPointer (..)
   ) where
 
 import Text.XML.HXT.Core
@@ -28,13 +29,14 @@ import Data.Maybe
 
 
 data ExtractedRegistry = ExtractedRegistry
-  { registryVendorId   :: ExtractedVendorId
-  , registryTags       :: [ExtractedTag]
-  , registryStructs    :: [ExtractedStruct]
-  , registryEnums      :: [ExtractedEnums]
-  , registryCommands   :: [ExtractedCommands]
-  , registryFeature    :: ExtractedFeature
-  , registryExtensions :: [ExtractedExtension]
+  { registryVendorId      :: ExtractedVendorId
+  , registryTags          :: [ExtractedTag]
+  , registryStructs       :: [ExtractedStruct]
+  , registryFuncPointers  :: [ExtractedFuncPointer]
+  , registryEnums         :: [ExtractedEnums]
+  , registryCommands      :: [ExtractedCommands]
+  , registryFeature       :: ExtractedFeature
+  , registryExtensions    :: [ExtractedExtension]
   } deriving (Show,Eq)
 
 
@@ -171,3 +173,10 @@ data ExtractedMember = ExtractedMember
   , mLen            :: Maybe String
   , mNoautoValidity :: Maybe String
   } deriving (Show,Eq)
+
+data ExtractedFuncPointer = ExtractedFuncPointer
+  { funcName :: String
+  , funcArgTypes :: [String]
+  , funcArgs :: [String]
+  } deriving (Show,Eq)
+

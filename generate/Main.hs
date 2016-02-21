@@ -8,7 +8,8 @@ main :: IO ()
 main = do
   registry <- runVkParser
   let enums = registryEnums registry
-  print enums
   let structs = registryStructs registry
-  writeFile "Enum.hsc" $ vkEnumFFIBindings enums
-  writeFile "Struct.hsc" $ vkStructFFIBindings structs
+  let funcPointers = registryFuncPointers registry
+  print funcPointers
+  --writeFile "Enum.hsc" $ vkEnumFFIBindings enums
+  --writeFile "Struct.hs" $ vkStructFFIBindings structs

@@ -3,7 +3,6 @@ module StructGen
   , vkStructFFIModuleDeclaration
   , vkStructFFIExports
   , vkStructFFIImports
-  , vkStructHeaderInclude
   , vkStructDataTypes
   , vkStructFFIBindings
   ) where
@@ -19,8 +18,6 @@ vkStructFFIBindings s =
   ++ vkStructFFIModuleDeclaration (vkStructFFIExports s)
   ++ "\n"
   ++ vkStructFFIImports
-  ++ "\n"
-  ++ vkStructHeaderInclude
   ++ "\n"
   ++ (concatMap vkStructDataTypes s)
 
@@ -57,10 +54,6 @@ vkStructFFIModuleDeclaration :: String -> String
 vkStructFFIModuleDeclaration x = "module Vulkan.Struct\n" ++ x ++ "  ) where\n"
 
 
-vkStructHeaderInclude :: String
-vkStructHeaderInclude = "#include <vulkan/vulkan.h>\n"
-
-
 vkStructFFIExports :: [ExtractedStruct] -> String
 vkStructFFIExports s =  concat (headStructTypes : (map (\x -> "  , " ++ x ++ "\n") tailStructTypes))
   where headStructTypes = (\x -> "  ( " ++ x ++ "\n") . sName . head $ s
@@ -68,17 +61,20 @@ vkStructFFIExports s =  concat (headStructTypes : (map (\x -> "  , " ++ x ++ "\n
 
 
 vkStructFFIImports :: String
-vkStructFFIImports = concat
-  [ "import Data.Int\n"
-  , "import Data.Word\n"
-  , "import Foreign.C.Types\n"
-  , "import Foreign.Storable\n"
+vkStructFFIImports = concat $ map (++"\n")
+  [ "import Data.Int"
+  , "import Data.Word"
+  , "import Foreign.C.Types"
+  , "import Foreign.Storable"
   , "import Vulkan.Types"]
 
 
+fieldNamespace :: String -> String
+fieldNamespace s = (toLower . head $ drop 2 s) : (drop 3 s)
+
+
 fmtField :: String -> String -> String
-fmtField vks1 s2 = ((toLower . head $ s1) : (drop 1 s1)) ++ ((toUpper . head $ s2) : (tail s2))
-  where s1 = drop 2 vks1
+fmtField s1 s2 = fieldNamespace s1 ++ ((toUpper . head $ s2) : (tail s2))
 
 
 vkStructDataTypes :: ExtractedStruct -> String
@@ -86,7 +82,7 @@ vkStructDataTypes s =
   ("data " ++ sName s ++ " = " ++ sName s ++ "\n")
   ++ "  { " ++ (fmtField (sName s) (mName . head . sMembers $ s)) ++ " :: !" ++ (cTypeAdapter . mType . head . sMembers $ s) ++ "\n"
   ++ concatMap (\x -> "  , " ++ (fmtField (sName s) (mName x)) ++ " :: !" ++ (cTypeAdapter . mType $ x) ++ "\n") (tail . sMembers $ s)
-  ++ "  }\n\n"
+  ++ "  } deriving (Show,Eq)\n\n"
 
 cTypeAdapter :: String -> String
 cTypeAdapter "char" = "CChar"
