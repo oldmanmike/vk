@@ -4,8 +4,8 @@ module Parser
   , perhaps
   , parseCommand
   , parseValidity
-  , parseType
-  , parseParam
+  , parseCommandType
+  , parseCommandParam
   , parseEnums
   , parseEnum
   , parseVendorId
@@ -23,10 +23,6 @@ module Parser
   ) where
 
 import Text.XML.HXT.Core
-import Data.Char
-import Data.List
-import Data.List.Split
-import Data.Maybe
 
 import Types
 
@@ -38,45 +34,89 @@ perhaps :: ArrowIf a => a b c -> a b (Maybe c)
 perhaps x = (arr Just <<< x) `orElse` constA Nothing
 
 
-parseCommand :: ArrowXml a => a XmlTree ExtractedCommand
-parseCommand = proc x -> do
-  command <- extract "command" -< x
-  maybeSuccessCode <- perhaps (getAttrValue0 "successcodes") -< command
-  maybeErrorCode <- perhaps (getAttrValue0 "errorcodes") -< command
-  maybeQueues <- perhaps (getAttrValue0 "queues") -< command
-  maybeRenderpass <- perhaps (getAttrValue0 "renderpass") -< command
-  maybeCmdbufferlevel <- perhaps (getAttrValue0 "cmdbufferlevel") -< command
-  name <- getText <<< getChildren <<< extract "name" <<< extract "proto" -< command
-  cType <- parseType <<< extract "proto" -< command
-  params <- listA $ parseParam -< command
-  maybeValidity <- parseValidity -< command
-  returnA -< ExtractedCommand maybeSuccessCode maybeErrorCode maybeQueues maybeRenderpass maybeCmdbufferlevel name cType params maybeValidity
+runVkParser :: IO ExtractedRegistry
+runVkParser = do
+  result <- runX (readDocument [withRemoveWS yes] "vk.xml" >>> parseVkXml)
+  return . head $ result
 
 
-parseValidity :: ArrowXml a => a XmlTree ExtractedValidity
-parseValidity = proc x -> do
-  validity <- extract "validity" -< x
-  uses <- perhaps (listA $ getText <<< getChildren <<< extract "usage") -< validity
-  returnA -< ExtractedValidity uses
+-------------------------------------------------------------------------------
 
 
-parseType :: ArrowXml a => a XmlTree ExtractedType
-parseType = proc x -> do
-  pType <- getText <<< getChildren <<< extract "type" -< x
-  pointer <- (getText <<< getChildren) >. length . filter (== '*') . concat -< x
-  returnA -< ExtractedType pType pointer
+parseVkXml :: IOSLA (XIOState ()) XmlTree ExtractedRegistry
+parseVkXml = proc x -> do
+  registry <- extract "registry" -< x
+  vendorids <- parseVendorId <<< extract "vendorids" -< registry
+  tags <- listA $ parseTag <<< extract "tags" -< registry
+  structs <- listA $ parseStruct -< registry
+  enums <- listA $ parseEnums -< registry
+  funcPointers <- listA $ parseFuncPointer <<< hasAttrValue "category" (=="funcpointer") <<< getChildren <<< extract "types" -< registry
+  commands <- listA $ parseCommand <<< extract "commands" -< registry
+  feature <- parseFeature -< registry
+  extensions <- listA $ parseExtension <<< extract "extensions" -< registry
+  returnA -< ExtractedRegistry vendorids tags structs funcPointers enums commands feature extensions
 
 
-parseParam :: ArrowXml a => a XmlTree ExtractedParam
-parseParam = proc x -> do
-  param <- extract "param" -< x
-  pName <- getText <<< getChildren <<< extract "name" -< param
-  pType <- parseType -< param
-  pOptional <- perhaps (getAttrValue0 "optional") -< param
-  pLen <- perhaps (getAttrValue0 "len") -< param
-  pExternSync <- perhaps (getAttrValue0 "externsync") -< param
-  pNoAutoValidity <- perhaps (getAttrValue0 "noautovalidity") -< param
-  returnA -< ExtractedParam pName pType pOptional pLen pExternSync pNoAutoValidity
+-------------------------------------------------------------------------------
+
+
+parseVendorId :: ArrowXml a => a XmlTree ExtractedVendorId
+parseVendorId = proc x -> do
+  vendorID <- extract "vendorid" -< x
+  name <- getAttrValue0 "name" -< vendorID
+  vid <- getAttrValue0 "id" -< vendorID
+  maybeComment <- perhaps (getAttrValue0 "comment") -< vendorID
+  returnA -< ExtractedVendorId name vid maybeComment
+
+
+-------------------------------------------------------------------------------
+
+
+parseTag :: ArrowXml a => a XmlTree ExtractedTag
+parseTag = proc x -> do
+  tag <- extract "tag" -< x
+  name <- getAttrValue0 "name" -< tag
+  author <- getAttrValue0 "author" -< tag
+  contact <- getAttrValue0 "contact"  -< tag
+  returnA -< ExtractedTag name author contact
+
+
+-------------------------------------------------------------------------------
+
+
+parseFuncPointer :: ArrowXml a => a XmlTree ExtractedFuncPointer
+parseFuncPointer = proc funcPointer -> do
+  name <- getText <<< getChildren <<< hasName "name" <<< getChildren -< funcPointer
+  args <- listA $ getText <<< getChildren -< funcPointer
+  argTypes <- listA $ getText <<< getChildren <<< extract "type" -< funcPointer
+  returnA -< ExtractedFuncPointer name argTypes args
+
+
+-------------------------------------------------------------------------------
+
+
+parseStruct :: ArrowXml a => a XmlTree ExtractedStruct
+parseStruct = proc x -> do
+  struct <- hasAttrValue "category" (=="struct") <<< getChildren <<< extract "types" -< x
+  name <- getAttrValue0 "name" -< struct
+  members <- listA $ parseMember -< struct
+  maybeReturnedOnly <- perhaps (getAttrValue0 "returnedonly") -< struct
+  maybeValidity <- perhaps $ parseValidity -< struct
+  returnA -< ExtractedStruct name members maybeReturnedOnly maybeValidity
+
+
+parseMember :: ArrowXml a => a XmlTree ExtractedMember
+parseMember = proc x -> do
+  member <- extract "member" -< x
+  memberType <- getText <<< getChildren <<< extract "type" -< member
+  memberName <- getText <<< getChildren <<< extract "name" -< member
+  maybeOptional <- perhaps (getAttrValue0 "optional") -< member
+  maybeLen <- perhaps (getAttrValue0 "len") -< member
+  maybeNoautoValidity <- perhaps (getAttrValue0 "noautovalidity") -< member
+  returnA -< ExtractedMember memberType memberName maybeOptional maybeLen maybeNoautoValidity
+
+
+-------------------------------------------------------------------------------
 
 
 parseEnums :: ArrowXml a => a XmlTree ExtractedEnums
@@ -101,22 +141,51 @@ parseEnum = proc x -> do
   returnA -< ExtractedEnum name maybeEValue maybeEBitpos maybeEComment
 
 
-parseVendorId :: ArrowXml a => a XmlTree ExtractedVendorId
-parseVendorId = proc x -> do
-  vendorID <- extract "vendorid" -< x
-  name <- getAttrValue0 "name" -< vendorID
-  vid <- getAttrValue0 "id" -< vendorID
-  maybeComment <- perhaps (getAttrValue0 "comment") -< vendorID
-  returnA -< ExtractedVendorId name vid maybeComment
+-------------------------------------------------------------------------------
 
 
-parseTag :: ArrowXml a => a XmlTree ExtractedTag
-parseTag = proc x -> do
-  tag <- extract "tag" -< x
-  name <- getAttrValue0 "name" -< tag
-  author <- getAttrValue0 "author" -< tag
-  contact <- getAttrValue0 "contact"  -< tag
-  returnA -< ExtractedTag name author contact
+parseCommand :: ArrowXml a => a XmlTree ExtractedCommand
+parseCommand = proc x -> do
+  command <- extract "command" -< x
+  maybeSuccessCode <- perhaps (getAttrValue0 "successcodes") -< command
+  maybeErrorCode <- perhaps (getAttrValue0 "errorcodes") -< command
+  maybeQueues <- perhaps (getAttrValue0 "queues") -< command
+  maybeRenderpass <- perhaps (getAttrValue0 "renderpass") -< command
+  maybeCmdbufferlevel <- perhaps (getAttrValue0 "cmdbufferlevel") -< command
+  name <- getText <<< getChildren <<< extract "name" <<< extract "proto" -< command
+  cType <- parseCommandType <<< extract "proto" -< command
+  params <- listA $ parseCommandParam -< command
+  maybeValidity <- parseValidity -< command
+  returnA -< ExtractedCommand maybeSuccessCode maybeErrorCode maybeQueues maybeRenderpass maybeCmdbufferlevel name cType params maybeValidity
+
+
+parseValidity :: ArrowXml a => a XmlTree ExtractedValidity
+parseValidity = proc x -> do
+  validity <- extract "validity" -< x
+  uses <- perhaps (listA $ getText <<< getChildren <<< extract "usage") -< validity
+  returnA -< ExtractedValidity uses
+
+
+parseCommandType :: ArrowXml a => a XmlTree ExtractedCommandType
+parseCommandType = proc x -> do
+  pType <- getText <<< getChildren <<< extract "type" -< x
+  pointer <- (getText <<< getChildren) >. length . filter (== '*') . concat -< x
+  returnA -< ExtractedCommandType pType pointer
+
+
+parseCommandParam :: ArrowXml a => a XmlTree ExtractedCommandParam
+parseCommandParam = proc x -> do
+  param <- extract "param" -< x
+  pName <- getText <<< getChildren <<< extract "name" -< param
+  pType <- parseCommandType -< param
+  pOptional <- perhaps (getAttrValue0 "optional") -< param
+  pLen <- perhaps (getAttrValue0 "len") -< param
+  pExternSync <- perhaps (getAttrValue0 "externsync") -< param
+  pNoAutoValidity <- perhaps (getAttrValue0 "noautovalidity") -< param
+  returnA -< ExtractedCommandParam pName pType pOptional pLen pExternSync pNoAutoValidity
+
+
+-------------------------------------------------------------------------------
 
 
 parseFeature :: ArrowXml a => a XmlTree ExtractedFeature
@@ -163,6 +232,7 @@ parseRCommand = proc x -> do
   rcname <- getAttrValue0 "name" -< command
   returnA -< ExtractedRequiredCommand rcname
 
+-------------------------------------------------------------------------------
 
 parseExtension :: ArrowXml a => a XmlTree ExtractedExtension
 parseExtension = proc x -> do
@@ -177,50 +247,3 @@ parseExtension = proc x -> do
   maybeEnums <- listA $ parseREnum <<< extract "require" -< extension
   maybeCommand <- listA $ parseRCommand <<< extract "require" -< extension
   returnA -< ExtractedExtension name number supported maybeProtect maybeAuthor maybeContact maybeTypes maybeEnums maybeCommand
-
-
-parseStruct :: ArrowXml a => a XmlTree ExtractedStruct
-parseStruct = proc x -> do
-  struct <- hasAttrValue "category" (=="struct") <<< getChildren <<< extract "types" -< x
-  name <- getAttrValue0 "name" -< struct
-  members <- listA $ parseMember -< struct
-  maybeReturnedOnly <- perhaps (getAttrValue0 "returnedonly") -< struct
-  maybeValidity <- perhaps $ parseValidity -< struct
-  returnA -< ExtractedStruct name members maybeReturnedOnly maybeValidity
-
-
-parseMember :: ArrowXml a => a XmlTree ExtractedMember
-parseMember = proc x -> do
-  member <- extract "member" -< x
-  memberType <- getText <<< getChildren <<< extract "type" -< member
-  memberName <- getText <<< getChildren <<< extract "name" -< member
-  maybeOptional <- perhaps (getAttrValue0 "optional") -< member
-  maybeLen <- perhaps (getAttrValue0 "len") -< member
-  maybeNoautoValidity <- perhaps (getAttrValue0 "noautovalidity") -< member
-  returnA -< ExtractedMember memberType memberName maybeOptional maybeLen maybeNoautoValidity
-
-parseFuncPointer :: ArrowXml a => a XmlTree ExtractedFuncPointer
-parseFuncPointer = proc funcPointer -> do
-  name <- getText <<< getChildren <<< hasName "name" <<< getChildren -< funcPointer
-  args <- listA $ getText <<< getChildren -< funcPointer
-  argTypes <- listA $ getText <<< getChildren <<< extract "type" -< funcPointer
-  returnA -< ExtractedFuncPointer name argTypes args
-
-parseVkXml :: IOSLA (XIOState ()) XmlTree ExtractedRegistry
-parseVkXml = proc x -> do
-  registry <- extract "registry" -< x
-  vendorids <- parseVendorId <<< extract "vendorids" -< registry
-  tags <- listA $ parseTag <<< extract "tags" -< registry
-  structs <- listA $ parseStruct -< registry
-  enums <- listA $ parseEnums -< registry
-  funcPointers <- listA $ parseFuncPointer <<< hasAttrValue "category" (=="funcpointer") <<< getChildren <<< extract "types" -< registry
-  commands <- listA $ parseCommand <<< extract "commands" -< registry
-  feature <- parseFeature -< registry
-  extensions <- listA $ parseExtension <<< extract "extensions" -< registry
-  returnA -< ExtractedRegistry vendorids tags structs funcPointers enums commands feature extensions
-
-
-runVkParser :: IO ExtractedRegistry
-runVkParser = do
-  result <- runX (readDocument [withRemoveWS yes] "vk.xml" >>> parseVkXml)
-  return . head $ result

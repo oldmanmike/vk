@@ -7,8 +7,8 @@ module Types
   , ExtractedEnum (..)
   , ExtractedCommand (..)
   , ExtractedValidity (..)
-  , ExtractedParam (..)
-  , ExtractedType (..)
+  , ExtractedCommandParam (..)
+  , ExtractedCommandType (..)
   , ExtractedFeature (..)
   , ExtractedRequire (..)
   , ExtractedRequiredType (..)
@@ -78,8 +78,8 @@ data ExtractedCommand = ExtractedCommand
   , cRenderpass      :: Maybe String
   , cCmdbufferLevel  :: Maybe String
   , cProtoName       :: String
-  , cProtoType       :: ExtractedType
-  , cParams          :: [ExtractedParam]
+  , cProtoType       :: ExtractedCommandType
+  , cParams          :: [ExtractedCommandParam]
   , cValidity        :: ExtractedValidity
   } deriving (Show,Eq)
 
@@ -89,9 +89,9 @@ data ExtractedValidity = ExtractedValidity
   } deriving (Show,Eq)
 
 
-data ExtractedParam = ExtractedParam
+data ExtractedCommandParam = ExtractedCommandParam
   { parName            :: String
-  , parType            :: ExtractedType
+  , parType            :: ExtractedCommandType
   , parOptional        :: Maybe String
   , parLen             :: Maybe String
   , parExternSync      :: Maybe String
@@ -99,7 +99,7 @@ data ExtractedParam = ExtractedParam
   } deriving (Show,Eq)
 
 
-data ExtractedType = ExtractedType
+data ExtractedCommandType = ExtractedCommandType
   { ptypeName :: String
   , pPointer  :: Int
   } deriving (Show,Eq)
