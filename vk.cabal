@@ -1,9 +1,9 @@
-name:                     vulkan
+name:                     vk
 version:                  0.0.0.1
 synopsis:                 (WIP)
 description:              Please see README.md
-homepage:                 https://github.com/oldmanmike/vulkan
-bug-reports:              https://github.com/oldmanmike/vulkan/issues
+homepage:                 https://github.com/oldmanmike/vk
+bug-reports:              https://github.com/oldmanmike/vk/issues
 license:                  BSD3
 license-file:             LICENSE
 author:                   Michael Carpenter
@@ -52,4 +52,4 @@ test-suite vulkan-test
 
 source-repository head
   type:     git
-  location: https://github.com/oldmanmike/vulkan
+  location: https://github.com/oldmanmike/vk
